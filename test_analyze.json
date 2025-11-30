@@ -1,0 +1,10 @@
+﻿{
+  "fornecedor": {"razao_social": "IGUAÇU MAQUINAS LTDA", "fantasia": "IGUAÇU", "cnpj": "11.111.111/0001-00"},
+  "faturado": {"nome_completo": "BELTRANO DA SILVA", "cpf": "999.999.999-99"},
+  "classificacao_despesa": "MANUTENÇÃO E OPERAÇÃO",
+  "numero_nota_fiscal": "NF-123",
+  "data_emissao": "2024-09-20",
+  "descricao_produtos": "Peças e serviços",
+  "valor_total": 1234.56,
+  "data_vencimento": "2024-10-20"
+}

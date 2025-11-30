@@ -1,0 +1,56 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: nf-mysql
+    environment:
+      MYSQL_DATABASE: banco_paraiba
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_USER: nfuser
+      MYSQL_PASSWORD: 1234
+    ports:
+      - "34105:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: nf-backend
+    ports:
+      - "5055:5000"
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_ENGINE: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: 1234
+      DB_NAME: banco_paraiba
+    volumes:
+      - ./backend/instance:/app/instance
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: nf-frontend
+    ports:
+      - "3085:3000"
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - REACT_APP_API_BASE_URL=http://localhost:5055
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

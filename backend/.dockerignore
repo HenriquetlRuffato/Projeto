@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.env
+instance/*.db
+instance/*.sqlite
+node_modules/
+.pdfs/
