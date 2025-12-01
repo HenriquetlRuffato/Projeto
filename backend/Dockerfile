@@ -1,27 +1,33 @@
 # Backend Dockerfile
 FROM python:3.12-slim
 
+# Configurações de ambiente
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     FLASK_ENV=production
 
+# Diretório de trabalho dentro do container
 WORKDIR /app
 
-# Sistema necessário para compilar dependências (se houver)
+# Pacotes do sistema necessários para compilar libs Python
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requisitos primeiro para otimizar cache
-COPY requirements.txt ./
+# Copia o requirements.txt que está em backend/ no repositório
+COPY backend/requirements.txt ./requirements.txt
+
+# Instala as dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código do backend
-COPY . .
+# Copia TODO o código do backend para dentro do container
+COPY backend/. .
 
-# Garantir diretório de banco SQLite
+# Garante diretório para o SQLite
 RUN mkdir -p /app/instance
 
+# Expõe a porta usada pelo Flask
 EXPOSE 5000
 
+# Comando para iniciar a aplicação
 CMD ["python", "run.py"]
