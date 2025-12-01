@@ -74,26 +74,35 @@ def save_invoice():
         
         # Criar ou buscar fornecedor
         fornecedor_data = data.get('fornecedor', {})
-        fornecedor = Fornecedor.query.filter_by(cnpj=fornecedor_data.get('cnpj')).first()
+        razao = (fornecedor_data.get('razao_social') or '').strip()
+        cnpj = (fornecedor_data.get('cnpj') or '').strip()
+        if not razao:
+            return jsonify({'error': 'Fornecedor: razao_social é obrigatório'}), 400
+        if not cnpj:
+            return jsonify({'error': 'Fornecedor: cnpj é obrigatório'}), 400
+        fornecedor = Fornecedor.query.filter_by(cnpj=cnpj).first()
         
         if not fornecedor:
             fornecedor = Fornecedor(
-                razao_social=fornecedor_data.get('razao_social'),
+                razao_social=razao,
                 fantasia=fornecedor_data.get('fantasia'),
-                cnpj=fornecedor_data.get('cnpj')
+                cnpj=cnpj
             )
             db.session.add(fornecedor)
             db.session.flush()
         
         # Criar ou buscar faturado
         faturado_data = data.get('faturado', {})
-        faturado = Faturado.query.filter_by(cpf=faturado_data.get('cpf')).first()
+        nome_fat = (faturado_data.get('nome_completo') or '').strip()
+        cpf_fat = (faturado_data.get('cpf') or '').strip()
+        if not cpf_fat:
+            return jsonify({'error': 'Faturado: cpf é obrigatório'}), 400
+        faturado = Faturado.query.filter_by(cpf=cpf_fat).first()
         
         if not faturado:
-            faturado = Faturado(
-                nome_completo=faturado_data.get('nome_completo'),
-                cpf=faturado_data.get('cpf')
-            )
+            if not nome_fat:
+                nome_fat = cpf_fat
+            faturado = Faturado(nome_completo=nome_fat, cpf=cpf_fat)
             db.session.add(faturado)
             db.session.flush()
         
@@ -102,7 +111,7 @@ def save_invoice():
             numero_nota_fiscal=data.get('numero_nota_fiscal'),
             data_emissao=datetime.strptime(data.get('data_emissao'), '%Y-%m-%d').date(),
             descricao_produtos=data.get('descricao_produtos'),
-            valor_total=Decimal(str(data.get('valor_total'))),
+            valor_total=_to_decimal(data.get('valor_total')),
             fornecedor_id=fornecedor.id,
             faturado_id=faturado.id
         )
@@ -113,7 +122,7 @@ def save_invoice():
         parcela = ParcelaPagar(
             numero_parcela=1,
             data_vencimento=datetime.strptime(data.get('data_vencimento'), '%Y-%m-%d').date(),
-            valor=Decimal(str(data.get('valor_total'))),
+            valor=_to_decimal(data.get('valor_total')),
             conta_pagar_id=conta_pagar.id
         )
         db.session.add(parcela)
@@ -246,10 +255,18 @@ def analyze_and_save():
         faturado = None
         tipo_despesa = None
 
-        if fornecedor_data.get('cnpj'):
-            fornecedor = Fornecedor.query.filter_by(cnpj=fornecedor_data.get('cnpj')).first()
-        if faturado_data.get('cpf'):
-            faturado = Faturado.query.filter_by(cpf=faturado_data.get('cpf')).first()
+        razao = (fornecedor_data.get('razao_social') or '').strip()
+        cnpj = (fornecedor_data.get('cnpj') or '').strip()
+        nome_fat = (faturado_data.get('nome_completo') or '').strip()
+        cpf_fat = (faturado_data.get('cpf') or '').strip()
+        if not razao:
+            return jsonify({'error': 'Fornecedor: razao_social é obrigatório'}), 400
+        if not cnpj:
+            return jsonify({'error': 'Fornecedor: cnpj é obrigatório'}), 400
+        if not cpf_fat:
+            return jsonify({'error': 'Faturado: cpf é obrigatório'}), 400
+        fornecedor = Fornecedor.query.filter_by(cnpj=cnpj).first()
+        faturado = Faturado.query.filter_by(cpf=cpf_fat).first()
         if classificacao_nome:
             tipo_despesa = TipoDespesa.query.filter_by(nome=classificacao_nome).first()
 
@@ -277,19 +294,18 @@ def analyze_and_save():
 
         if not fornecedor:
             fornecedor = Fornecedor(
-                razao_social=fornecedor_data.get('razao_social'),
+                razao_social=razao,
                 fantasia=fornecedor_data.get('fantasia'),
-                cnpj=fornecedor_data.get('cnpj')
+                cnpj=cnpj
             )
             db.session.add(fornecedor)
             db.session.flush()
             created["fornecedor"] = True
 
         if not faturado:
-            faturado = Faturado(
-                nome_completo=faturado_data.get('nome_completo'),
-                cpf=faturado_data.get('cpf')
-            )
+            if not nome_fat:
+                nome_fat = cpf_fat
+            faturado = Faturado(nome_completo=nome_fat, cpf=cpf_fat)
             db.session.add(faturado)
             db.session.flush()
             created["faturado"] = True
@@ -308,7 +324,7 @@ def analyze_and_save():
             numero_nota_fiscal=data.get('numero_nota_fiscal'),
             data_emissao=datetime.strptime(data.get('data_emissao'), '%Y-%m-%d').date(),
             descricao_produtos=data.get('descricao_produtos'),
-            valor_total=Decimal(str(data.get('valor_total'))),
+            valor_total=_to_decimal(data.get('valor_total')),
             fornecedor_id=fornecedor.id,
             faturado_id=faturado.id
         )
@@ -318,7 +334,7 @@ def analyze_and_save():
         parcela = ParcelaPagar(
             numero_parcela=1,
             data_vencimento=datetime.strptime(data.get('data_vencimento'), '%Y-%m-%d').date(),
-            valor=Decimal(str(data.get('valor_total'))),
+            valor=_to_decimal(data.get('valor_total')),
             conta_pagar_id=conta_pagar.id
         )
         db.session.add(parcela)
@@ -376,3 +392,25 @@ def health_check():
         'message': 'API funcionando corretamente',
         'timestamp': datetime.now().isoformat()
     }), 200
+def _to_decimal(val):
+    try:
+        if val is None:
+            return Decimal('0')
+        if isinstance(val, (int, float, Decimal)):
+            try:
+                return Decimal(str(val))
+            except Exception:
+                return Decimal('0')
+        s = str(val).strip().replace('\xa0', '')
+        if not s:
+            return Decimal('0')
+        s = s.replace('R$', '').replace('BRL', '').replace(' ', '')
+        import re
+        s = re.sub(r"[^0-9,.-]", "", s)
+        if s.count(',') == 1 and s.count('.') >= 1:
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            s = s.replace(',', '.')
+        return Decimal(s)
+    except Exception:
+        return Decimal('0')

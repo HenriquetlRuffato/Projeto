@@ -4,6 +4,28 @@ from models import *
 from datetime import datetime
 from decimal import Decimal
 
+def _to_decimal(val):
+    try:
+        if val is None:
+            return Decimal('0')
+        if isinstance(val, (int, float, Decimal)):
+            try:
+                return Decimal(str(val))
+            except Exception:
+                return Decimal('0')
+        s = str(val).strip().replace('\xa0', '')
+        if not s:
+            return Decimal('0')
+        s = s.replace('R$', '').replace('BRL', '').replace(' ', '')
+        import re
+        s = re.sub(r"[^0-9,.-]", "", s)
+        if s.count(',') == 1 and s.count('.') >= 1:
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            s = s.replace(',', '.')
+        return Decimal(s)
+    except Exception:
+        return Decimal('0')
 # ==================== FORNECEDORES ====================
 
 @app.route('/api/fornecedores', methods=['POST'])
@@ -52,6 +74,66 @@ def get_faturados():
             })
         return jsonify(result), 200
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/faturados', methods=['POST'])
+def create_faturado():
+    try:
+        data = request.get_json() or {}
+        nome = (data.get('nome_completo') or '').strip()
+        cpf = (data.get('cpf') or '').strip()
+        if not cpf:
+            return jsonify({'error': 'CPF é obrigatório'}), 400
+        existing = Faturado.query.filter_by(cpf=cpf).first()
+        if existing:
+            return jsonify({'error': 'CPF já cadastrado'}), 400
+        if not nome:
+            nome = cpf
+        faturado = Faturado(nome_completo=nome, cpf=cpf)
+        db.session.add(faturado)
+        db.session.commit()
+        return jsonify({'id': faturado.id, 'message': 'Faturado criado com sucesso'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/faturados/<int:faturado_id>', methods=['PUT'])
+def update_faturado(faturado_id):
+    try:
+        faturado = Faturado.query.get_or_404(faturado_id)
+        data = request.get_json() or {}
+        if data.get('cpf') and data.get('cpf') != faturado.cpf:
+            existing = Faturado.query.filter_by(cpf=data.get('cpf')).first()
+            if existing:
+                return jsonify({'error': 'CPF já cadastrado'}), 400
+        faturado.nome_completo = data.get('nome_completo', faturado.nome_completo)
+        faturado.cpf = data.get('cpf', faturado.cpf)
+        db.session.commit()
+        return jsonify({'message': 'Faturado atualizado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/faturados/<int:faturado_id>/inativar', methods=['PATCH'])
+def inactivate_faturado(faturado_id):
+    try:
+        faturado = Faturado.query.get_or_404(faturado_id)
+        faturado.is_active = False
+        db.session.commit()
+        return jsonify({'message': 'Faturado inativado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/faturados/<int:faturado_id>/reativar', methods=['PATCH'])
+def reactivate_faturado(faturado_id):
+    try:
+        faturado = Faturado.query.get_or_404(faturado_id)
+        faturado.is_active = True
+        db.session.commit()
+        return jsonify({'message': 'Faturado reativado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/fornecedores/<int:fornecedor_id>', methods=['PUT'])
@@ -296,6 +378,23 @@ def reactivate_tipo_despesa(tipo_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/tipos-despesa/<int:tipo_id>', methods=['PUT'])
+def update_tipo_despesa(tipo_id):
+    try:
+        tipo = TipoDespesa.query.get_or_404(tipo_id)
+        data = request.get_json() or {}
+        if data.get('nome') and data.get('nome') != tipo.nome:
+            existing = TipoDespesa.query.filter_by(nome=data.get('nome')).first()
+            if existing:
+                return jsonify({'error': 'Tipo de despesa já cadastrado'}), 400
+        tipo.nome = data.get('nome', tipo.nome)
+        tipo.descricao = data.get('descricao', tipo.descricao)
+        db.session.commit()
+        return jsonify({'message': 'Tipo de despesa atualizado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 # ==================== TIPOS DE RECEITA ====================
 
 @app.route('/api/tipos-receita', methods=['GET'])
@@ -345,6 +444,45 @@ def create_tipo_receita():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/tipos-receita/<int:tipo_id>', methods=['PUT'])
+def update_tipo_receita(tipo_id):
+    try:
+        tipo = TipoReceita.query.get_or_404(tipo_id)
+        data = request.get_json() or {}
+        if data.get('nome') and data.get('nome') != tipo.nome:
+            existing = TipoReceita.query.filter_by(nome=data.get('nome')).first()
+            if existing:
+                return jsonify({'error': 'Tipo de receita já cadastrado'}), 400
+        tipo.nome = data.get('nome', tipo.nome)
+        tipo.descricao = data.get('descricao', tipo.descricao)
+        db.session.commit()
+        return jsonify({'message': 'Tipo de receita atualizado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tipos-receita/<int:tipo_id>/inativar', methods=['PATCH'])
+def inactivate_tipo_receita(tipo_id):
+    try:
+        tipo = TipoReceita.query.get_or_404(tipo_id)
+        tipo.is_active = False
+        db.session.commit()
+        return jsonify({'message': 'Tipo de receita inativado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tipos-receita/<int:tipo_id>/reativar', methods=['PATCH'])
+def reactivate_tipo_receita(tipo_id):
+    try:
+        tipo = TipoReceita.query.get_or_404(tipo_id)
+        tipo.is_active = True
+        db.session.commit()
+        return jsonify({'message': 'Tipo de receita reativado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 # ==================== CONTAS A RECEBER ====================
 
 @app.route('/api/contas-receber', methods=['GET'])
@@ -381,7 +519,7 @@ def create_conta_receber():
             numero_documento=data.get('numero_documento'),
             data_emissao=datetime.strptime(data.get('data_emissao'), '%Y-%m-%d').date(),
             descricao=data.get('descricao'),
-            valor_total=Decimal(str(data.get('valor_total'))),
+            valor_total=_to_decimal(data.get('valor_total')),
             cliente_id=data.get('cliente_id')
         )
         
@@ -449,6 +587,85 @@ def reactivate_conta_receber(conta_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/contas-pagar/<int:conta_id>', methods=['PUT'])
+def update_conta_pagar(conta_id):
+    try:
+        conta = ContaPagar.query.get_or_404(conta_id)
+        data = request.get_json() or {}
+        if data.get('numero_nota_fiscal'):
+            conta.numero_nota_fiscal = data.get('numero_nota_fiscal')
+        if data.get('data_emissao'):
+            conta.data_emissao = datetime.strptime(data.get('data_emissao'), '%Y-%m-%d').date()
+        if data.get('descricao_produtos'):
+            conta.descricao_produtos = data.get('descricao_produtos')
+        if data.get('valor_total') is not None:
+            conta.valor_total = _to_decimal(data.get('valor_total'))
+        db.session.commit()
+        return jsonify({'message': 'Conta a pagar atualizada com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/contas-receber/<int:conta_id>', methods=['PUT'])
+def update_conta_receber(conta_id):
+    try:
+        conta = ContaReceber.query.get_or_404(conta_id)
+        data = request.get_json() or {}
+        if data.get('numero_documento'):
+            conta.numero_documento = data.get('numero_documento')
+        if data.get('data_emissao'):
+            conta.data_emissao = datetime.strptime(data.get('data_emissao'), '%Y-%m-%d').date()
+        if data.get('descricao'):
+            conta.descricao = data.get('descricao')
+        if data.get('valor_total') is not None:
+            conta.valor_total = _to_decimal(data.get('valor_total'))
+        db.session.commit()
+        return jsonify({'message': 'Conta a receber atualizada com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/seed-test-data', methods=['POST'])
+def seed_test_data():
+    try:
+        payload = (request.get_json(silent=True) or {})
+        n = int(request.args.get('n') or payload.get('n') or 200)
+        created = {'fornecedores': 0, 'clientes': 0, 'faturados': 0, 'tipos_despesa': 0, 'tipos_receita': 0, 'contas_pagar': 0, 'contas_receber': 0}
+        for i in range(n):
+            f = Fornecedor(razao_social=f'Fornecedor {i}', fantasia=f'Fantasia {i}', cnpj=f'{i%90:02d}.{(i*3)%1000:03d}.{(i*7)%1000:03d}/{(i*11)%10000:04d}-{i%100:02d}')
+            db.session.add(f)
+            db.session.flush()
+            created['fornecedores'] += 1
+            cli = Cliente(nome_completo=f'Cliente {i}', cpf=f'{(i*13)%1000:03d}.{(i*17)%1000:03d}.{(i*19)%1000:03d}-{i%100:02d}')
+            db.session.add(cli)
+            db.session.flush()
+            created['clientes'] += 1
+            fat = Faturado(nome_completo=f'Faturado {i}', cpf=f'{(i*23)%1000:03d}.{(i*29)%1000:03d}.{(i*31)%1000:03d}-{(i+1)%100:02d}')
+            db.session.add(fat)
+            db.session.flush()
+            created['faturados'] += 1
+            td = TipoDespesa(nome=f'Despesa {i}', descricao=f'Categoria automática {i}')
+            db.session.add(td)
+            db.session.flush()
+            created['tipos_despesa'] += 1
+            tr = TipoReceita(nome=f'Receita {i}', descricao=f'Categoria automática {i}')
+            db.session.add(tr)
+            db.session.flush()
+            created['tipos_receita'] += 1
+            cp = ContaPagar(numero_nota_fiscal=f'NF-{i}', data_emissao=datetime.utcnow().date(), descricao_produtos=f'Itens {i}', valor_total=Decimal('100.00'), fornecedor_id=f.id, faturado_id=fat.id)
+            db.session.add(cp)
+            db.session.flush()
+            created['contas_pagar'] += 1
+            cr = ContaReceber(numero_documento=f'DOC-{i}', data_emissao=datetime.utcnow().date(), descricao=f'Descricao {i}', valor_total=Decimal('150.00'), cliente_id=cli.id)
+            db.session.add(cr)
+            db.session.flush()
+            created['contas_receber'] += 1
+        db.session.commit()
+        return jsonify({'message': 'Seed concluído', 'created': created}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/contas-pagar/<int:conta_id>/parcelas', methods=['POST'])
 def add_parcela_conta_pagar(conta_id):
     """Adicionar parcela a uma conta a pagar"""
@@ -458,7 +675,7 @@ def add_parcela_conta_pagar(conta_id):
         parcela = ParcelaPagar(
             numero_parcela=data.get('numero_parcela'),
             data_vencimento=datetime.strptime(data.get('data_vencimento'), '%Y-%m-%d').date(),
-            valor=Decimal(str(data.get('valor'))),
+            valor=_to_decimal(data.get('valor')),
             conta_pagar_id=conta.id
         )
         db.session.add(parcela)
@@ -477,7 +694,7 @@ def add_parcela_conta_receber(conta_id):
         parcela = ParcelaReceber(
             numero_parcela=data.get('numero_parcela'),
             data_vencimento=datetime.strptime(data.get('data_vencimento'), '%Y-%m-%d').date(),
-            valor=Decimal(str(data.get('valor'))),
+            valor=_to_decimal(data.get('valor')),
             conta_receber_id=conta.id
         )
         db.session.add(parcela)
